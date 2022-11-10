@@ -18,26 +18,24 @@ import javax.persistence.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserImage {
+@DiscriminatorValue("U")
+public class UserImage extends ImageFile {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
 
-    private Long size;
+    private UserImage(Long id, Long size, String contentType, String originalName, byte[] bytes) {
+        super(id, size, contentType, originalName, bytes);
+    }
+    public static UserImage from(Long size, String contentType, String originalName, byte[] bytes) {
+        return new UserImage(null, size, contentType, originalName, bytes);
+    }
 
-    @Image
-    private String contentType;
-
-    private String originalName;
-    @Lob
-    private byte[] bytes;
-
+    //양방향 연관관계 편의 메소드
     public void setUser(User user) {
+        //기존 관계 제거
         if (this.user != null) {
             this.user.getUserImages().remove(this);
         }
@@ -46,12 +44,8 @@ public class UserImage {
         user.getUserImages().add(this);
     }
 
-    public void updateUserImage(UserImage userImage) {
-        this.size = userImage.getSize();
-        this.contentType = userImage.getContentType();
-        this.originalName = userImage.getOriginalName();
-        this.bytes = userImage.getBytes();
-
+    @Override
+    public void updateImageFile(ImageFile imageFile) {
+        super.updateImageFile(imageFile);
     }
-
 }

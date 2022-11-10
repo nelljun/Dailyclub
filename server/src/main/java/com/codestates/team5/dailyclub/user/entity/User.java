@@ -1,7 +1,6 @@
 package com.codestates.team5.dailyclub.user.entity;
 
 import com.codestates.team5.dailyclub.common.audit.Auditable;
-import com.codestates.team5.dailyclub.image.entity.ProgramImage;
 import com.codestates.team5.dailyclub.image.entity.UserImage;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,7 +25,6 @@ public class User extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
     @NotNull
     @Column(unique = true)
     private String loginId;
@@ -41,7 +39,6 @@ public class User extends Auditable {
     @NotNull
     private String password;
 
-//  수정 예정
     @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private List<UserImage> userImages = new ArrayList<>();

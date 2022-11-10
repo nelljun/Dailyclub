@@ -36,8 +36,8 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     @ApiResponse(responseCode = "201", description = "CREATED", content = @Content(schema = @Schema(implementation = UserDto.Response.class)))
     @PostMapping(value = "/join", produces = MediaType.APPLICATION_JSON_VALUE)
-    public String joinUser(@RequestBody @Validated UserDto.Post requestBody) {
-        User response = userService.createUser(requestBody);
+    public String joinUser(@RequestBody @Validated UserDto.Post userPostDto) {
+        User response = userService.createUser(userPostDto);
         return "회원가입이 완료되었습니다.";
 
     }

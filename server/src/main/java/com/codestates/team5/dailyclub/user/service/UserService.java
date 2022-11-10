@@ -2,16 +2,14 @@ package com.codestates.team5.dailyclub.user.service;
 
 import com.codestates.team5.dailyclub.image.entity.UserImage;
 import com.codestates.team5.dailyclub.image.repository.UserImageRepository;
-import com.codestates.team5.dailyclub.image.util.ImageUtils;
-import com.codestates.team5.dailyclub.refreshToken.RefreshToken;
 import com.codestates.team5.dailyclub.refreshToken.RefreshTokenRepository;
 import com.codestates.team5.dailyclub.throwable.entity.BusinessLogicException;
 import com.codestates.team5.dailyclub.throwable.entity.ExceptionCode;
 import com.codestates.team5.dailyclub.user.dto.UserDto;
 import com.codestates.team5.dailyclub.user.entity.User;
-import com.codestates.team5.dailyclub.user.mapper.UserMapper;
 import com.codestates.team5.dailyclub.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -24,10 +22,10 @@ import java.io.IOException;
 
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
-    private final UserMapper userMapper;
     private final UserImageRepository userImageRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
@@ -44,7 +42,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User updateUser(Long loginUserId, User userFromPatchDto, Long userImageId, MultipartFile imageFile) throws IOException {
+    public User updateUser(Long loginUserId, User userFromPatchDto, Long userImageId, MultipartFile multipartFile) throws IOException {
         User findUser
                 = userRepository.findById(userFromPatchDto.getId())
                 .orElseThrow(() ->
@@ -67,24 +65,33 @@ public class UserService {
             findUser.updateIntroduction(userFromPatchDto.getIntroduction());
         }
 
-        if(imageFile == null && userImageId == null) {
+        if(multipartFile == null && userImageId == null) {
             return userRepository.save(findUser);
-        }else if(imageFile != null && userImageId == null) {
-            UserImage userImage = ImageUtils.parseToUserImgae(imageFile);
+        }else if(multipartFile != null && userImageId == null) {
+            UserImage userImage = parseToUserImage(multipartFile);
             userImage.setUser(findUser);
             userImageRepository.save(userImage);
-        }else if (imageFile == null && userImageId !=null) {
+        }else if (multipartFile == null && userImageId !=null) {
             userImageRepository.deleteById(userImageId);
-        }else if (imageFile != null && userImageId !=null) {
+        }else if (multipartFile != null && userImageId !=null) {
             UserImage findUserImage
                     =userImageRepository.findById(userImageId)
                     .orElseThrow(() ->
                             new BusinessLogicException(ExceptionCode.IMAGE_NOT_FOUND));
-            UserImage userImage = ImageUtils.parseToUserImgae(imageFile);
-            findUserImage.updateUserImage(userImage);
+            UserImage userImage = parseToUserImage(multipartFile);
+            findUserImage.updateImageFile(userImage);
         }
         return userRepository.save(findUser);
+    }
+    private UserImage parseToUserImage(MultipartFile multipartFile) throws IOException {
+        String contentType = multipartFile.getContentType();
+        log.info("contentType : {}", contentType);
 
+        long size = multipartFile.getSize();
+        String originalName = multipartFile.getOriginalFilename();
+        byte[] bytes = multipartFile.getBytes();
+
+        return UserImage.from(size, contentType, originalName, bytes);
     }
 
     public User findUser(Long id) {

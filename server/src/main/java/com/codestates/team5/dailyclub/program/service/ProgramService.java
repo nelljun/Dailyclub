@@ -4,7 +4,6 @@ import com.codestates.team5.dailyclub.apply.entity.Apply;
 import com.codestates.team5.dailyclub.apply.repository.ApplyRepository;
 import com.codestates.team5.dailyclub.image.entity.ProgramImage;
 import com.codestates.team5.dailyclub.image.repository.ProgramImageRepository;
-import com.codestates.team5.dailyclub.image.util.ImageUtils;
 import com.codestates.team5.dailyclub.notification.entity.Notification;
 import com.codestates.team5.dailyclub.notification.event.NotificationEventPublisher;
 import com.codestates.team5.dailyclub.program.dto.SearchFilterDto;
@@ -54,7 +53,7 @@ public class ProgramService {
      * 2. Program 등록
      * 3. ProgramImage 등록
      */
-    public Program createProgram(Long loginUserId, Program program, MultipartFile imageFile) throws IOException {
+    public Program createProgram(Long loginUserId, Program program, MultipartFile multipartFile) throws IOException {
         //User를 DB 조회 (영속성 컨텍스트에 저장)
         User user = userRepository.findById(loginUserId)
                         .orElseThrow(() ->
@@ -69,10 +68,10 @@ public class ProgramService {
         //Program 등록
         Program createdProgram = programRepository.save(program);
 
-        log.info("[등록] imageFile is null : {}", imageFile == null);
+        log.info("[등록] multipartFile is null : {}", multipartFile == null);
 
-        if (imageFile!= null && !imageFile.isEmpty()) {
-            ProgramImage programImage = ImageUtils.parseToProgramImage(imageFile);
+        if (multipartFile!= null && !multipartFile.isEmpty()) {
+            ProgramImage programImage = parseToProgramImage(multipartFile);
 
             //ProgramImage Entity 연관관계 설정 (양방향)
             programImage.setProgram(createdProgram);
@@ -87,7 +86,7 @@ public class ProgramService {
     public Program updateProgram(Long loginUserId,
                                  Program programFromPatchDto,
                                  Long programImageId,
-                                 MultipartFile imageFile) throws IOException {
+                                 MultipartFile multipartFile) throws IOException {
         log.info("programId : {}", programFromPatchDto.getId());
 
         //유저 존재 확인
@@ -124,8 +123,8 @@ public class ProgramService {
         programById.updateProgram(programFromPatchDto);
 
         //programImage 처리
-        log.info("[수정] imageFile is null : {}", imageFile == null);
-        processProgramImage(programImageId, imageFile, programById);
+        log.info("[수정] multipartFile is null : {}", multipartFile == null);
+        processProgramImage(programImageId, multipartFile, programById);
 
         //신청자들에게 update 알림 보내기
         publishNotificationEventToApplicants(programById.getId(), UPDATE);
@@ -135,6 +134,7 @@ public class ProgramService {
 
 
     public void deleteProgram(Long loginUserId, Long programId) {
+        //프로그램 존재 확인
         Program findProgram
             = programRepository.findById(programId)
             .orElseThrow(() ->
@@ -181,7 +181,7 @@ public class ProgramService {
         );
         
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-        return programRepository.findByUserId(pageable, userId);
+        return programRepository.findByUser(pageable, userById);
     }
 
 
@@ -203,38 +203,50 @@ public class ProgramService {
     }
 
     //programImage 처리
-    private void processProgramImage(Long programImageId, MultipartFile imageFile, Program findProgram) throws IOException {
+    private void processProgramImage(Long programImageId, MultipartFile multipartFile, Program findProgram) throws IOException {
         /**
-         *   수정 / 등록 시 이미지 존재 여부 (imageFile null && isEmpty() / programImageId null 로 판단)
+         *   수정 / 등록 시 이미지 존재 여부 (multipartFile null && isEmpty() / programImageId null 로 판단)
          * 1. x      x  -> 아무 작업 x
          * 2. o      x  -> 이미지 새로 등록
          * 3. x      o  -> 기존 이미지 삭제
          * 4. o      o  -> 이미지 변경
          */
-        if ((imageFile != null && !imageFile.isEmpty()) && programImageId == null) {
+        if ((multipartFile != null && !multipartFile.isEmpty()) && programImageId == null) {
             //2번 : 이미지 새로 등록
-            ProgramImage programImage = ImageUtils.parseToProgramImage(imageFile);
+            ProgramImage programImage = parseToProgramImage(multipartFile);
 
             //ProgramImage Entity 연관관계 설정 (양방향)
             programImage.setProgram(findProgram);
 
             //ProgramImage 등록
             programImageRepository.save(programImage);
-        } else if (imageFile == null && programImageId != null) {
+        } else if (multipartFile == null && programImageId != null) {
             //3번 : 기존 이미지 삭제
             programImageRepository.deleteById(programImageId);
-        } else if ((imageFile != null && !imageFile.isEmpty()) && programImageId != null) {
+        } else if ((multipartFile != null && !multipartFile.isEmpty()) && programImageId != null) {
             //4번 : 이미지 변경
             ProgramImage findProgramImage
                 = programImageRepository.findById(programImageId)
                 .orElseThrow(() ->
                     new BusinessLogicException(IMAGE_NOT_FOUND)
                 );
-            ProgramImage programImage = ImageUtils.parseToProgramImage(imageFile);
+            ProgramImage programImage = parseToProgramImage(multipartFile);
 
             //programImage dirty checking
-            findProgramImage.updateProgramImage(programImage);
+            findProgramImage.updateImageFile(programImage);
         }
+    }
+
+    //MultipartFile -> ImageFile
+    private ProgramImage parseToProgramImage(MultipartFile multipartFile) throws IOException {
+        String contentType = multipartFile.getContentType();
+        log.info("contentType : {}", contentType);
+
+        long size = multipartFile.getSize();
+        String originalName = multipartFile.getOriginalFilename();
+        byte[] bytes = multipartFile.getBytes();
+
+        return ProgramImage.from(size, contentType, originalName, bytes);
     }
 
     private void publishNotificationEventToApplicants(Long programId, Notification.NotificationType type) {
@@ -246,7 +258,6 @@ public class ProgramService {
                     notificationEventPublisher.publish(userId, programId, type);
                 }
             );
-
     }
 
 }
