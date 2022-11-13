@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -20,25 +21,19 @@ import javax.persistence.ManyToOne;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProgramImage {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+@DiscriminatorValue("P")
+public class ProgramImage extends ImageFile {
 
     @ManyToOne
     @JoinColumn(name = "program_id")
     private Program program;
 
-    private Long size;
-
-    @Image
-    private String contentType;
-
-    private String originalName;
-
-    @Lob
-    private byte[] bytes;
+    private ProgramImage(Long id, Long size, String contentType, String originalName, byte[] bytes) {
+        super(id, size, contentType, originalName, bytes);
+    }
+    public static ProgramImage from(Long size, String contentType, String originalName, byte[] bytes) {
+        return new ProgramImage(null, size, contentType, originalName, bytes);
+    }
 
     //양방향 연관관계 편의 메소드
     public void setProgram(Program program) {
@@ -51,11 +46,8 @@ public class ProgramImage {
         program.getProgramImages().add(this);
     }
 
-    //비즈니스 메소드
-    public void updateProgramImage(ProgramImage programImage) {
-        this.size = programImage.getSize();
-        this.contentType = programImage.getContentType();
-        this.originalName = programImage.getOriginalName();
-        this.bytes = programImage.getBytes();
+    @Override
+    public void updateImageFile(ImageFile imageFile) {
+        super.updateImageFile(imageFile);
     }
 }
